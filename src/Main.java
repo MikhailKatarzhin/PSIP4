@@ -3,31 +3,37 @@ import java.util.concurrent.SynchronousQueue;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public class Main {
-    static AtomicInteger nReads;
+
     public static void main(String[] args) throws InterruptedException {
 
-        long millis = System.currentTimeMillis();
-        final int nWritings = 13;
+        final long millis = System.currentTimeMillis();
+        final int nWritings = 10;
         final int nWriters = 5;
-        final int nReaders = 3;
+        final int nReaders = 5;
         final String IS_EMPTY = "__";
         final String IS_WROTE = "[]";
         final String IS_RED = "<>";
-        nReads = new AtomicInteger(nWriters * nWritings);
+        final int arraySize = 5;
+        final ArrayList<SynchronousQueue<Integer>> synchronousQueueArrayList = new ArrayList<>();
+        final AtomicInteger nReads = new AtomicInteger(nWriters * nWritings);
+        final AtomicInteger nWrites = new AtomicInteger(nWriters * nWritings);
 
-        SynchronousQueue<Integer> channel = new SynchronousQueue<>();
+        for (int i = 0; i < arraySize; i++)
+            synchronousQueueArrayList.add(new SynchronousQueue<>());
 
         ArrayList<Thread> threadsReaders = new ArrayList<>();
         for (int i = 0; i < nReaders; i++) {
             threadsReaders.add(new Thread(() -> {
                 long nanoTime = System.nanoTime();
                 int nReadings = 0;
-                while (nReads.decrementAndGet() >= 0) {
+                for (int readPointer = nReads.decrementAndGet(); readPointer >= 0; readPointer = nReads.decrementAndGet()) {
                     try {
-                        int current = channel.take();
+                        int current = synchronousQueueArrayList.get(readPointer % arraySize).take();
                         nReadings++;
                         StringBuilder tmp = new StringBuilder();
-                        tmp.append("\t\t\t").append(Thread.currentThread().getName()).append("R").append(nReadings);
+                        tmp.append("\t\t\t").append(Thread.currentThread().getName())
+                                .append("B").append(readPointer % arraySize)
+                                .append("R").append(nReadings);
                         for (int k = 0; k < nWritings; k++) {
                             tmp.append(k > current ? IS_EMPTY : IS_RED);
                         }
@@ -47,9 +53,12 @@ public class Main {
                 long nanoTime = System.nanoTime();
                 for (int j = 0; j < nWritings; j++)
                     try {
-                        channel.put(j);
+                        int writePointer = nWrites.decrementAndGet() % arraySize;
+                        synchronousQueueArrayList.get(writePointer).put(j);
                         StringBuilder tmp = new StringBuilder();
-                        tmp.append("\t").append(Thread.currentThread().getName()).append("W");
+                        tmp.append("\t").append(Thread.currentThread().getName())
+                                .append("B").append(writePointer % arraySize)
+                                .append("W");
                         for (int k = 0; k < nWritings; k++) {
                             tmp.append(k > j ? IS_EMPTY : IS_WROTE);
                         }
